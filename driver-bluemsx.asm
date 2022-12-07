@@ -3,11 +3,17 @@
 	; Version Beta 5 by Piter Punk
 	; Based on version 0.1 by Konamiman
 
+	org 4100h
+
 DRV_START:
 
-TESTADD	equ	0F3F5h
+	ifdef MASTER_ONLY
+	.print1 Sunrise IDE - MASTER ONLY driver
+	else
+	.print1 Sunrise IDE - MASTER AND SLAVE driver
+	endif
 
-MASTER_ONLY equ 0
+TESTADD	equ	0F3F5h
 
 ;-----------------------------------------------------------------------------
 ;
@@ -409,7 +415,7 @@ WAIT_RESET_END:
 	ld	(ix),a
 MASTER_CHECK1_END:
 
-if MASTER_ONLY eq 0
+ifndef MASTER_ONLY
 
         ld      a,46			;Print dot
         call    CHPUT
@@ -515,7 +521,7 @@ NODEV_MASTER:
 	
 OK_MASTER:
 
-if MASTER_ONLY eq 0
+ifndef MASTER_ONLY
 
 	;--- Get info and show the name for the SLAVE
 	
@@ -604,7 +610,7 @@ INIT_NO_DEV:
 	ld	de,NODEVS_S
 	call	PRINT
 
-if MASTER_ONLY eq 0
+ifndef MASTER_ONLY
 
 	ld	de,SLAVE_S
 	call	PRINT
@@ -1689,7 +1695,7 @@ INFO_S:
 	db	"Sunrise IDE driver v"
 	db	VER_MAIN+"0",".",VER_SEC+"0",".",VER_REV+"0",13,10
 
-if MASTER_ONLY eq 1
+ifdef MASTER_ONLY
 
 	db "Master device only edition",13,10
 
@@ -1706,7 +1712,7 @@ NODEVS_S:
 MASTER_S:
 	db	"Master device: ",0
 
-if MASTER_ONLY eq 0
+ifndef MASTER_ONLY
 
 SLAVE_S:
 	db	"Slave device:  ",0
