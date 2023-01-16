@@ -121,19 +121,21 @@ M_SRST	equ	100b ;(1 SHL SRST)
 
 ; IDE commands
 
-ATACMD:
+module ATACMD
 .PRDSECTRT	equ	#20
 .PWRSECTRT	equ	#30
 .DEVDIAG	equ	#90
 .IDENTIFY	equ	#EC
 .SETFEATURES	equ	#EF
+endmod
 
-ATAPICMD:
+module ATAPICMD
 .RESET		equ	#08
 .PACKET		equ	#A0
 .IDENTPACKET	equ	#A1
+endmod
 
-PACKETCMD:
+module PACKETCMD
 .RQSENSE	equ	#03	;
 .RDCAPACITY	equ	#25	; Read the media capacity
 .READ10		equ	#28	; Read sectors (16bit)
@@ -141,6 +143,7 @@ PACKETCMD:
 .WRITE10	equ	#2A	; Write sectors (16bit)
 .WRITE12	equ	#AA	; Write sectors (32bit)
 .GTMEDIASTAT	equ	#DA	; Get media status
+endmod
 
 
 ;-----------------------------------------------------------------------------
