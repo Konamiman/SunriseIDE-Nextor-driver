@@ -13,16 +13,16 @@ DRV_START:
 
 	.RELAB
 
-	INCLUDE ../../../../sdk/asm/macros/undoc.inc
+	INCLUDE asm/macros/undoc.inc
 
-	INCLUDE ../../../../sdk/asm/constants/driver_result_codes.inc
+	INCLUDE asm/constants/driver_result_codes.inc
 
 	module DRIVER_QUERY
-	INCLUDE ../../../../sdk/asm/constants/driver_driver_queries.inc
+	INCLUDE asm/constants/driver_driver_queries.inc
 	endmod
 
 	module DEVICE_QUERY
-	INCLUDE ../../../../sdk/asm/constants/driver_device_queries.inc
+	INCLUDE asm/constants/driver_device_queries.inc
 	endmod
 
 TESTADD	equ	0F3F5h
@@ -310,7 +310,7 @@ _IFORM	equ	0F0h
 _IDEVL	equ	0B5h
 _IPARM	equ	08Bh
 
-	INCLUDE ../../../../sdk/asm/constants/rom_bank_header.inc
+	INCLUDE asm/constants/rom_bank_header.inc
 
 
 ;* Set the current bank
@@ -360,7 +360,7 @@ DRV_NAME:
 ; to the Nextor v3 driver structure
 
 
-	INCLUDE ../../../../sdk/asm/code/output_string.asm
+	INCLUDE asm/code/output_string.asm
 
 
 	;--- Driver query

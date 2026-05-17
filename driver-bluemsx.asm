@@ -3,17 +3,14 @@
 	; Version Beta 5 by Piter Punk
 	; Based on version 0.1 by Konamiman
 
-	INCLUDE	../../macros.inc
-	INCLUDE	../../const.inc
-
-	INCLUDE ../../../../sdk/asm/constants/driver_result_codes.inc
+	INCLUDE asm/constants/driver_result_codes.inc
 
 	module DRIVER_QUERY
-	INCLUDE ../../../../sdk/asm/constants/driver_driver_queries.inc
+	INCLUDE asm/constants/driver_driver_queries.inc
 	endmod
 
 	module DEVICE_QUERY
-	INCLUDE ../../../../sdk/asm/constants/driver_device_queries.inc
+	INCLUDE asm/constants/driver_device_queries.inc
 	endmod
 
 	org 4100h
@@ -155,14 +152,14 @@ CHGET	equ	009Fh
 ; BDOS / disk error codes used by DEV_RW and DEV_FORMAT
 ;
 
-	INCLUDE ../../../../sdk/asm/constants/dos_errors.inc
+	INCLUDE asm/constants/dos_errors.inc
 
 ;-----------------------------------------------------------------------------
 ;
 ; Routines available on the kernel ROM bank header (page 1)
 ;
 
-	INCLUDE ../../../../sdk/asm/constants/rom_bank_header.inc
+	INCLUDE asm/constants/rom_bank_header.inc
 
 
 ;-----------------------------------------------------------------------------
@@ -208,7 +205,7 @@ DRV_NAME:
 ; to the Nextor v3 driver structure
 
 
-	INCLUDE ../../../../sdk/asm/code/output_string.asm
+	INCLUDE asm/code/output_string.asm
 
 
 	;--- Driver query

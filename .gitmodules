@@ -1,0 +1,3 @@
+[submodule "external/Nextor"]
+	path = external/Nextor
+	url = /home/konamiman/Nextor
