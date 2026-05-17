@@ -1,16 +1,5 @@
 # Build outputs
-*.bin
-*.BIN
-*.ROM
-*.sym
-*.SYM
-*.lst
-*.LST
-*.map
-*.noi
-*.rel
-*.REL
-*.bytes
+/bin/
 
 # Editors / IDEs
 .vs/

@@ -73,7 +73,7 @@ jobs:
       - name: Confirm all four ROMs were produced
         run: |
           for variant in "" ".MasterOnly" ".blueMSX" ".MasterOnly.blueMSX"; do
-            f="$(ls Nextor-*.SunriseIDE${variant}${{ matrix.variant.base_suffix }}.ROM)"
+            f="$(ls bin/Nextor-*.SunriseIDE${variant}${{ matrix.variant.base_suffix }}.ROM)"
             [ -s "$f" ] || { echo "Missing or empty: $f"; exit 1; }
             echo "OK: $f"
           done
@@ -82,4 +82,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sunride-roms-${{ matrix.variant.name }}
-          path: Nextor-*.SunriseIDE*.ROM
+          path: bin/Nextor-*.SunriseIDE*.ROM
