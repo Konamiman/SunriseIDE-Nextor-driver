@@ -5,3 +5,9 @@
 	# GitHub.
 	url = /home/konamiman/Nextor
 	# url = https://github.com/Konamiman/Nextor.git
+	# Branch tracked by `git submodule update --remote`. The recorded
+	# gitlink (the commit this submodule is pinned to) is what gets
+	# checked out on a plain `git submodule update`; this `branch`
+	# setting only kicks in when you ask git to bump the pin to the
+	# branch tip via `git submodule update --remote external/Nextor`.
+	branch = v3.0
