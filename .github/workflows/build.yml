@@ -1,0 +1,85 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - { name: "default",  base_suffix: "",          env: "" }
+          - { name: "no-undoc", base_suffix: ".NO_UNDOC", env: "NO_UNDOC_CPU_INSTRUCTIONS=1" }
+
+    steps:
+      - name: Checkout this driver (sparse submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      # `actions/checkout@v4` doesn't natively support sparse submodules, so
+      # initialise the submodule ourselves and limit it to the SDK directory.
+      - name: Initialise SDK submodule (sparse-checkout sdk/ only)
+        run: |
+          git submodule init external/Nextor
+          git -c protocol.file.allow=always submodule update --no-recommend-shallow external/Nextor
+          ( cd external/Nextor && git sparse-checkout init --cone && git sparse-checkout set sdk )
+
+      - name: Set up .NET 8 (required by Nestor80)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Nestor80
+        run: |
+          NESTOR80_VERSION=1.3.4
+          curl -L -o /tmp/nestor80.zip \
+            "https://github.com/Konamiman/Nestor80/releases/download/v${NESTOR80_VERSION}/Nestor80-linux-x64.zip"
+          mkdir -p "$HOME/.local/bin"
+          unzip -d "$HOME/.local/bin" /tmp/nestor80.zip
+          chmod +x "$HOME/.local/bin/N80" "$HOME/.local/bin/LK80" "$HOME/.local/bin/LB80"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Check out Nextor (for kernel base + mknexrom)
+        uses: actions/checkout@v4
+        with:
+          repository: Konamiman/Nextor
+          ref: master
+          path: nextor
+
+      - name: Build mknexrom
+        run: |
+          gcc -O2 -o "$HOME/.local/bin/mknexrom" nextor/buildtools/sources/mknexrom.c
+
+      - name: Build Nextor kernel base file (${{ matrix.variant.name }})
+        run: |
+          cd nextor/source/kernel
+          ${{ matrix.variant.env }} make base
+          # `make base` copies the .dat to nextor/bin/kernels/. Surface the path
+          # for the next step.
+          BASE_FILE="$(ls $GITHUB_WORKSPACE/nextor/bin/kernels/Nextor-*.base${{ matrix.variant.base_suffix }}.dat)"
+          echo "NEXTOR_BASE=$BASE_FILE" >> "$GITHUB_ENV"
+
+      - name: Build driver ROMs (${{ matrix.variant.name }})
+        run: |
+          ${{ matrix.variant.env }} make
+
+      - name: Confirm all four ROMs were produced
+        run: |
+          for variant in "" ".MasterOnly" ".blueMSX" ".MasterOnly.blueMSX"; do
+            f="$(ls Nextor-*.SunriseIDE${variant}${{ matrix.variant.base_suffix }}.ROM)"
+            [ -s "$f" ] || { echo "Missing or empty: $f"; exit 1; }
+            echo "OK: $f"
+          done
+
+      - name: Upload ROMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunride-roms-${{ matrix.variant.name }}
+          path: Nextor-*.SunriseIDE*.ROM
