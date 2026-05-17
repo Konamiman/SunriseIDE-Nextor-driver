@@ -1,3 +1,7 @@
 [submodule "external/Nextor"]
 	path = external/Nextor
+	# Local development URL. Comment this out and uncomment the line
+	# below before pushing the repo so end users clone Nextor from
+	# GitHub.
 	url = /home/konamiman/Nextor
+	# url = https://github.com/Konamiman/Nextor.git
