@@ -1,6 +1,6 @@
 # Sunrise IDE driver for Nextor 3
 
-This repository contains the Sunrise IDE hardware driver for [Nextor](https://github.com/Konamiman/Nextor) 3.x. It produces a Nextor ROM image that combines a Nextor kernel base file with this driver, ready to be flashed to the Sunrise IDE cartridge.
+This repository contains the Sunrise IDE hardware driver for [Nextor](https://github.com/Konamiman/Nextor). It produces a Nextor ROM image that combines a Nextor kernel (v3.0 or newer) base file with this driver, ready to be flashed to the Sunrise IDE cartridge or any compatible storage controller.
 
 Four variants are built by default:
 
@@ -8,18 +8,20 @@ Four variants are built by default:
 | ---------------------------------------- | ----------------------------------------------------------- |
 | `Nextor-<ver>.SunriseIDE.ROM`                    | Master + slave, real hardware.                              |
 | `Nextor-<ver>.SunriseIDE.MasterOnly.ROM`         | Master only, real hardware.                                 |
-| `Nextor-<ver>.SunriseIDE.blueMSX.ROM`            | Master + slave, blueMSX emulator (driver image is padded).  |
+| `Nextor-<ver>.SunriseIDE.blueMSX.ROM`            | Master + slave, blueMSX emulator.  |
 | `Nextor-<ver>.SunriseIDE.MasterOnly.blueMSX.ROM` | Master only, blueMSX emulator.                              |
 
-`<ver>` and any kernel-base variant suffix (e.g. `.NO_UNDOC.SHIFT_INV`) are picked up automatically from the `NEXTOR_BASE` filename — see [Building](#building) below.
+`<ver>` and any kernel-base variant suffix (e.g. `.NO_UNDOC.SHIFT_INV`) are picked up automatically from the `NEXTOR_BASE` filename, see [Building](#building) below.
+
+The regular (not blueMSX specific) variant can be used in blueMSX too, but then only the slave device will be recognized.
 
 ## Repository contents
 
 | File                | Purpose                                                                                  |
 | ------------------- | ---------------------------------------------------------------------------------------- |
 | `driver.asm`        | The driver for real Sunrise IDE hardware.                                                |
-| `driver-bluemsx.asm`| Variant of the driver used inside the blueMSX emulator.                                  |
-| `chgbnk.asm`        | Bank-switching routine specific to the Sunrise IDE cartridge mapper.                     |
+| `driver-bluemsx.asm`| Variant of the driver to be used for the blueMSX emulator.                               |
+| `chgbnk.asm`        | Bank switching routine specific to the Sunrise IDE cartridge mapper.                     |
 | `Makefile`          | Build rules; see below.                                                                  |
 | `external/Nextor`   | Git submodule pointing at the Nextor repo, sparse-checkout to the `sdk/` directory only. |
 
@@ -55,7 +57,7 @@ git submodule update --init
 
 ### If you'd rather not fetch the full Nextor repository
 
-The sequence above clones the entire Nextor repository before the sparse-checkout limits the working tree. If you'd rather only fetch the SDK objects (typically <100 KB instead of tens of MB), clone the driver *without* `--recurse-submodules` and then set up the submodule as a blobless partial clone with sparse-checkout from the start:
+The sequence above clones the entire Nextor repository before the sparse-checkout limits the working tree. If you'd rather only fetch the SDK files (typically <100 KB instead of tens of MB), clone the driver *without* `--recurse-submodules` and then set up the submodule as a blobless partial clone with sparse-checkout from the start:
 
 ```sh
 git clone https://github.com/Konamiman/SunriseIDE-Nextor-driver.git [<target-dir>]
@@ -93,7 +95,42 @@ NO_UNDOC_CPU_INSTRUCTIONS=1 \
 make
 ```
 
-The Nextor base filename's version and variant suffix (e.g. `.NO_UNDOC.SHIFT_INV`) are mirrored in the output ROM filenames. **You are responsible for keeping `NO_UNDOC_CPU_INSTRUCTIONS` consistent with the base file's variant** — the Makefile does not infer it for you.
+The Nextor base filename's version and variant suffix (e.g. `.NO_UNDOC.SHIFT_INV`) are mirrored in the output ROM filenames. **You are responsible for keeping `NO_UNDOC_CPU_INSTRUCTIONS` consistent with the base file's variant**: the Makefile does not infer it for you.
+
+### Building without `make`
+
+The Makefile is the recommended way, but each ROM is produced by just three tool invocations: two `N80` calls (one for the driver, one for the bank-switching routine) and one `mknexrom` call that combines them with the kernel base. If you'd rather drive them by hand, here's the sequence for the regular `Nextor-<ver>.SunriseIDE.ROM`:
+
+```sh
+mkdir -p tmp
+
+# Assemble the driver  ->  tmp/driver.bin
+N80 driver.asm tmp/ \
+    --no-string-escapes --build-type abs --output-file-extension bin \
+    --include-directory external/Nextor/sdk
+
+# Assemble the bank-switching routine  ->  tmp/chgbnk.bin
+N80 chgbnk.asm tmp/ \
+    --no-string-escapes --build-type abs --output-file-extension bin \
+    --include-directory external/Nextor/sdk
+
+# Combine kernel base + driver + chgbnk  ->  Nextor-<ver>.SunriseIDE.ROM
+mknexrom /path/to/Nextor-<ver>.base.dat Nextor-<ver>.SunriseIDE.ROM \
+    /d:tmp/driver.bin /m:tmp/chgbnk.bin
+```
+
+The other three variants are slight modifications of the same recipe:
+
+- **MasterOnly**: add `--define-symbols MASTER_ONLY` to the `N80 driver.asm` call and direct the output to a distinct filename (e.g. `tmp/driver.masteronly.bin`). Pass that filename to `mknexrom` and pick the matching `Nextor-<ver>.SunriseIDE.MasterOnly.ROM` output name.
+- **blueMSX**: assemble `driver-bluemsx.asm` instead of `driver.asm`, then prepend a 256-byte zero block to the resulting `.bin` before handing it to `mknexrom`:
+  ```sh
+  dd if=/dev/zero bs=1 count=256 of=tmp/256.bytes
+  cat tmp/256.bytes tmp/driver-bluemsx.bin > tmp/padded.bin
+  mknexrom /path/to/Nextor-<ver>.base.dat Nextor-<ver>.SunriseIDE.blueMSX.ROM \
+      /d:tmp/padded.bin /m:tmp/chgbnk.bin
+  ```
+  Combine with `MASTER_ONLY` if you want the MasterOnly blueMSX variant.
+- **NO_UNDOC**: add `--define-symbols NO_UNDOC_CPU_INSTRUCTIONS` to *every* `N80` call (regardless of which variant you're building), and use a `Nextor-<ver>.base.NO_UNDOC.dat` kernel base. The driver-side and base-side undoc settings must match.
 
 ## Make variables
 
@@ -105,8 +142,15 @@ The Nextor base filename's version and variant suffix (e.g. `.NO_UNDOC.SHIFT_INV
 | `MKNEXROM`                  | Path to the `mknexrom` tool.                                         | `mknexrom` (from `PATH`) |
 | `NO_UNDOC_CPU_INSTRUCTIONS` | If set (e.g. `=1`), assemble the driver without undocumented opcodes. | _(unset)_              |
 
-`make clean` removes all build outputs.
+Cleanup targets:
+
+| Target           | Effect                                                                  |
+| ---------------- | ----------------------------------------------------------------------- |
+| `make clean`     | Removes `tmp/` (intermediate `.bin` files and helper artifacts). `bin/` and the shippable ROMs in it are kept. |
+| `make clean-bin` | Removes `bin/` (the shippable ROMs).                                    |
+| `make distclean` | Removes both `tmp/` and `bin/`.                                         |
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE). Note that [Nextor itself has a different license](https://github.com/Konamiman/Nextor/blob/v3.0/LICENSE.md).
+
