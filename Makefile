@@ -1,13 +1,18 @@
 # Makefile for the Sunrise IDE driver for Nextor 3.
 #
 # By default builds four ROMs (combining this driver with the Nextor
-# kernel base file pointed at by NEXTOR_BASE), all placed in the
-# `bin/` directory:
+# kernel base file pointed at by NEXTOR_BASE), placed in `bin/`:
 #
 #   * bin/Nextor-<ver>.SunriseIDE.ROM                     - master + slave
 #   * bin/Nextor-<ver>.SunriseIDE.MasterOnly.ROM          - master only
 #   * bin/Nextor-<ver>.SunriseIDE.blueMSX.ROM             - blueMSX emulator variant
 #   * bin/Nextor-<ver>.SunriseIDE.MasterOnly.blueMSX.ROM  - master only, blueMSX
+#
+# Intermediate build artifacts (.bin files produced by N80, the
+# 256-byte zero block, the temporary padded blueMSX driver images) go
+# to `tmp/` instead and are dropped by `make clean`. The shippable
+# ROMs in `bin/` survive `make clean` and are removed only by
+# `make clean-bin` (or `make distclean` for both).
 #
 # <ver> and any variant suffix (e.g. ".NO_UNDOC.SHIFT_INV") are taken
 # from the NEXTOR_BASE filename, which must follow the convention
@@ -19,9 +24,9 @@
 ### Configurable variables ###################################################
 
 # NEXTOR_BASE: path to the Nextor kernel base .dat file (mandatory for
-# all targets except `clean`).
+# all targets except the clean ones).
 ifeq ($(strip $(NEXTOR_BASE)),)
-ifneq ($(MAKECMDGOALS),clean)
+ifeq ($(filter clean clean-bin distclean,$(MAKECMDGOALS)),)
 $(error NEXTOR_BASE is not set. Point it at a Nextor kernel base .dat file)
 endif
 else
@@ -47,9 +52,10 @@ MKNEXROM ?= mknexrom
 NO_UNDOC_CPU_INSTRUCTIONS ?=
 
 
-### Output directory #########################################################
+### Output directories #######################################################
 
 BIN := bin
+TMP := tmp
 
 
 ### Filename derivation ######################################################
@@ -88,65 +94,74 @@ _DEFINES_NO_UNDOC := $(if $(NO_UNDOC_CPU_INSTRUCTIONS),--define-symbols NO_UNDOC
 
 ### Default target ###########################################################
 
-.PHONY: all clean
+.PHONY: all clean clean-bin distclean
 all: $(ROM_REGULAR) $(ROM_MASTERONLY) $(ROM_BLUEMSX) $(ROM_MASTERONLY_BLUEMSX)
 
-# Order-only prereq for outputs that live in $(BIN): ensures the
-# directory exists without making its mtime affect rebuild decisions.
-$(BIN):
+# Order-only prereqs for outputs that live in the build directories:
+# ensure the directory exists without making its mtime affect rebuild
+# decisions.
+$(BIN) $(TMP):
 	@mkdir -p $@
 
 
-### Driver and chgbnk binaries ###############################################
+### Driver and chgbnk binaries (intermediates) ###############################
 
 # 'driver.asm' produces the hardware driver. N80's "if the output path
 # is a directory, use the default base name in it" behavior lets us
-# point it at $(BIN)/ for the regular variants.
+# point it at $(TMP)/ for the regular variants.
 
-$(BIN)/driver.bin: driver.asm | $(BIN)
-	$(N80) driver.asm $(BIN)/ $(N80_FLAGS) $(_DEFINES_NO_UNDOC)
+$(TMP)/driver.bin: driver.asm | $(TMP)
+	$(N80) driver.asm $(TMP)/ $(N80_FLAGS) $(_DEFINES_NO_UNDOC)
 
-$(BIN)/driver.masteronly.bin: driver.asm | $(BIN)
-	$(N80) driver.asm $(BIN)/driver.masteronly.bin $(N80_FLAGS) $(_DEFINES_NO_UNDOC) --define-symbols MASTER_ONLY
+$(TMP)/driver.masteronly.bin: driver.asm | $(TMP)
+	$(N80) driver.asm $(TMP)/driver.masteronly.bin $(N80_FLAGS) $(_DEFINES_NO_UNDOC) --define-symbols MASTER_ONLY
 
 # 'driver-bluemsx.asm' is the variant used inside the blueMSX emulator.
 
-$(BIN)/driver-bluemsx.bin: driver-bluemsx.asm | $(BIN)
-	$(N80) driver-bluemsx.asm $(BIN)/ $(N80_FLAGS) $(_DEFINES_NO_UNDOC)
+$(TMP)/driver-bluemsx.bin: driver-bluemsx.asm | $(TMP)
+	$(N80) driver-bluemsx.asm $(TMP)/ $(N80_FLAGS) $(_DEFINES_NO_UNDOC)
 
-$(BIN)/driver-bluemsx.masteronly.bin: driver-bluemsx.asm | $(BIN)
-	$(N80) driver-bluemsx.asm $(BIN)/driver-bluemsx.masteronly.bin $(N80_FLAGS) $(_DEFINES_NO_UNDOC) --define-symbols MASTER_ONLY
+$(TMP)/driver-bluemsx.masteronly.bin: driver-bluemsx.asm | $(TMP)
+	$(N80) driver-bluemsx.asm $(TMP)/driver-bluemsx.masteronly.bin $(N80_FLAGS) $(_DEFINES_NO_UNDOC) --define-symbols MASTER_ONLY
 
-$(BIN)/chgbnk.bin: chgbnk.asm | $(BIN)
-	$(N80) chgbnk.asm $(BIN)/ $(N80_FLAGS) $(_DEFINES_NO_UNDOC)
+$(TMP)/chgbnk.bin: chgbnk.asm | $(TMP)
+	$(N80) chgbnk.asm $(TMP)/ $(N80_FLAGS) $(_DEFINES_NO_UNDOC)
 
 
-### ROM combination via mknexrom #############################################
+### ROM combination via mknexrom (final outputs) #############################
 
-$(ROM_REGULAR): $(BIN)/driver.bin $(BIN)/chgbnk.bin
-	$(MKNEXROM) $(NEXTOR_BASE) $@ /d:$(BIN)/driver.bin /m:$(BIN)/chgbnk.bin
+$(ROM_REGULAR): $(TMP)/driver.bin $(TMP)/chgbnk.bin | $(BIN)
+	$(MKNEXROM) $(NEXTOR_BASE) $@ /d:$(TMP)/driver.bin /m:$(TMP)/chgbnk.bin
 
-$(ROM_MASTERONLY): $(BIN)/driver.masteronly.bin $(BIN)/chgbnk.bin
-	$(MKNEXROM) $(NEXTOR_BASE) $@ /d:$(BIN)/driver.masteronly.bin /m:$(BIN)/chgbnk.bin
+$(ROM_MASTERONLY): $(TMP)/driver.masteronly.bin $(TMP)/chgbnk.bin | $(BIN)
+	$(MKNEXROM) $(NEXTOR_BASE) $@ /d:$(TMP)/driver.masteronly.bin /m:$(TMP)/chgbnk.bin
 
 # The blueMSX-targeted ROMs need a 256-byte zero block prepended to the
 # driver binary before mknexrom combines it with the kernel.
 
-$(BIN)/256.bytes: | $(BIN)
+$(TMP)/256.bytes: | $(TMP)
 	dd if=/dev/zero of=$@ bs=1 count=256
 
-$(ROM_BLUEMSX): $(BIN)/driver-bluemsx.bin $(BIN)/chgbnk.bin $(BIN)/256.bytes
-	cat $(BIN)/256.bytes $(BIN)/driver-bluemsx.bin > $(BIN)/_driver-bluemsx.padded.bin
-	$(MKNEXROM) $(NEXTOR_BASE) $@ /d:$(BIN)/_driver-bluemsx.padded.bin /m:$(BIN)/chgbnk.bin
-	rm -f $(BIN)/_driver-bluemsx.padded.bin
+$(ROM_BLUEMSX): $(TMP)/driver-bluemsx.bin $(TMP)/chgbnk.bin $(TMP)/256.bytes | $(BIN)
+	cat $(TMP)/256.bytes $(TMP)/driver-bluemsx.bin > $(TMP)/_driver-bluemsx.padded.bin
+	$(MKNEXROM) $(NEXTOR_BASE) $@ /d:$(TMP)/_driver-bluemsx.padded.bin /m:$(TMP)/chgbnk.bin
+	rm -f $(TMP)/_driver-bluemsx.padded.bin
 
-$(ROM_MASTERONLY_BLUEMSX): $(BIN)/driver-bluemsx.masteronly.bin $(BIN)/chgbnk.bin $(BIN)/256.bytes
-	cat $(BIN)/256.bytes $(BIN)/driver-bluemsx.masteronly.bin > $(BIN)/_driver-bluemsx-masteronly.padded.bin
-	$(MKNEXROM) $(NEXTOR_BASE) $@ /d:$(BIN)/_driver-bluemsx-masteronly.padded.bin /m:$(BIN)/chgbnk.bin
-	rm -f $(BIN)/_driver-bluemsx-masteronly.padded.bin
+$(ROM_MASTERONLY_BLUEMSX): $(TMP)/driver-bluemsx.masteronly.bin $(TMP)/chgbnk.bin $(TMP)/256.bytes | $(BIN)
+	cat $(TMP)/256.bytes $(TMP)/driver-bluemsx.masteronly.bin > $(TMP)/_driver-bluemsx-masteronly.padded.bin
+	$(MKNEXROM) $(NEXTOR_BASE) $@ /d:$(TMP)/_driver-bluemsx-masteronly.padded.bin /m:$(TMP)/chgbnk.bin
+	rm -f $(TMP)/_driver-bluemsx-masteronly.padded.bin
 
 
 ### Housekeeping #############################################################
 
+# `make clean` keeps the shippable ROMs in bin/, only wipes intermediates.
 clean:
+	rm -rf $(TMP)
+
+# `make clean-bin` removes the shippable ROMs.
+clean-bin:
 	rm -rf $(BIN)
+
+# `make distclean` removes both.
+distclean: clean clean-bin
