@@ -1,10 +1,6 @@
 [submodule "external/Nextor"]
 	path = external/Nextor
-	# Local development URL. Comment this out and uncomment the line
-	# below before pushing the repo so end users clone Nextor from
-	# GitHub.
-	url = /home/konamiman/Nextor
-	# url = https://github.com/Konamiman/Nextor.git
+	url = https://github.com/Konamiman/Nextor.git
 	# Branch tracked by `git submodule update --remote`. The recorded
 	# gitlink (the commit this submodule is pinned to) is what gets
 	# checked out on a plain `git submodule update`; this `branch`
