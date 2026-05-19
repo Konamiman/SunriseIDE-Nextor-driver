@@ -36,8 +36,8 @@ You need:
 This repository uses a git submodule to pull in the Nextor SDK; clone with `--recurse-submodules` and then configure the submodule for a sparse checkout of the `sdk/` directory (the only thing this driver consumes from Nextor):
 
 ```sh
-git clone --recurse-submodules <repo-url>
-cd <repo-dir>/external/Nextor
+git clone --recurse-submodules https://github.com/Konamiman/SunriseIDE-Nextor-driver.git [<target-dir>]
+cd <target-dir>/external/Nextor
 git sparse-checkout init --cone
 git sparse-checkout set sdk
 cd ../..
@@ -51,6 +51,28 @@ If you have a local clone of Nextor and want the submodule to point at it (e.g. 
 git config submodule.external/Nextor.url /path/to/your/local/Nextor
 git submodule sync
 git submodule update --init
+```
+
+### If you'd rather not fetch the full Nextor repository
+
+The sequence above clones the entire Nextor repository before the sparse-checkout limits the working tree. If you'd rather only fetch the SDK objects (typically <100 KB instead of tens of MB), clone the driver *without* `--recurse-submodules` and then set up the submodule as a blobless partial clone with sparse-checkout from the start:
+
+```sh
+git clone https://github.com/Konamiman/SunriseIDE-Nextor-driver.git [<target-dir>]
+cd <target-dir>
+git submodule init external/Nextor
+git submodule update --init --filter=blob:none external/Nextor
+git -C external/Nextor sparse-checkout init --cone
+git -C external/Nextor sparse-checkout set sdk
+git -C external/Nextor checkout
+```
+
+...or, equivalently, just `make setup`:
+
+```sh
+git clone https://github.com/Konamiman/SunriseIDE-Nextor-driver.git [<target-dir>]
+cd <target-dir>
+make setup
 ```
 
 ## Building

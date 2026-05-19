@@ -24,9 +24,9 @@
 ### Configurable variables ###################################################
 
 # NEXTOR_BASE: path to the Nextor kernel base .dat file (mandatory for
-# all targets except the clean ones).
+# every target except `setup` and the clean ones).
 ifeq ($(strip $(NEXTOR_BASE)),)
-ifeq ($(filter clean clean-bin distclean,$(MAKECMDGOALS)),)
+ifeq ($(filter setup clean clean-bin distclean,$(MAKECMDGOALS)),)
 $(error NEXTOR_BASE is not set. Point it at a Nextor kernel base .dat file)
 endif
 else
@@ -165,3 +165,20 @@ clean-bin:
 
 # `make distclean` removes both.
 distclean: clean clean-bin
+
+
+### One-time setup ###########################################################
+
+# `make setup` initializes the Nextor SDK submodule as a blobless
+# partial clone with sparse-checkout for the `sdk/` directory only, so
+# that the full Nextor repository is never fetched. Run this once,
+# right after cloning this repo, to initialize the external/Nextor directory.
+.PHONY: setup
+setup:
+	@echo "Setting up the Nextor SDK submodule (blobless + sparse-checkout for sdk/ only)..."
+	git submodule init external/Nextor
+	git submodule update --init --filter=blob:none external/Nextor
+	git -C external/Nextor sparse-checkout init --cone
+	git -C external/Nextor sparse-checkout set sdk
+	git -C external/Nextor checkout
+	@echo "Done. Set NEXTOR_BASE and run 'make' to build."
