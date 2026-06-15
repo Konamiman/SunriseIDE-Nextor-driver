@@ -23,15 +23,17 @@ The regular (not blueMSX specific) variant can be used in blueMSX too, but then 
 | `driver-bluemsx.asm`| Variant of the driver to be used for the blueMSX emulator.                               |
 | `chgbnk.asm`        | Bank switching routine specific to the Sunrise IDE cartridge mapper.                     |
 | `Makefile`          | Build rules; see below.                                                                  |
+| `docker-build.sh`   | Wrapper that builds the ROMs in the Nextor dev Docker image (no local toolchain needed). |
 | `external/Nextor`   | Git submodule pointing at the Nextor repo, sparse-checkout to the `sdk/` directory only. |
 
 ## Development environment
 
-You need:
+The quickest path needs **nothing but Docker**: see [Building with the Nextor dev Docker image](#building-with-the-nextor-dev-docker-image) below, which supplies the toolchain, the SDK and the kernel base files for you (no submodule or base file to fetch). To build with a local toolchain instead, you need:
 
 - [**Nestor80**](https://github.com/Konamiman/Nestor80) (`N80`) on your `PATH`, or pointed at via the `N80` make variable.
 - **`mknexrom`** on your `PATH`, or pointed at via the `MKNEXROM` make variable. The source lives in the Nextor repository under `buildtools/sources/mknexrom.c`.
 - A POSIX **`make`** and `dd` / `cat` (for the blueMSX variants).
+- A Nextor kernel base file and the Nextor SDK (the `external/Nextor` submodule, set up with `make setup`).
 
 ## Cloning the repository
 
@@ -78,6 +80,31 @@ make setup
 ```
 
 ## Building
+
+There are two ways to build: with the **Nextor dev Docker image** (no local toolchain, SDK or kernel base file needed) or with a **local toolchain**.
+
+### Building with the Nextor dev Docker image
+
+The [`nextor-dev`](https://github.com/Konamiman/Nextor/pkgs/container/nextor-dev) image bundles `N80`, `mknexrom`, the Nextor SDK and all six kernel base-file variants, and presets `NEXTOR_BASE` / `NEXTOR_SDK`, so a build needs nothing else on your machine - not even the `external/Nextor` submodule. The `docker-build.sh` wrapper runs the build in a container, mounting this repository and writing the ROMs into `bin/` owned by you (not root):
+
+```sh
+./docker-build.sh                       # all four ROMs, default kernel base
+./docker-build.sh --variant NO_UNDOC    # build against the NO_UNDOC kernel base
+./docker-build.sh --variant CTRL_INV
+./docker-build.sh --variant NO_UNDOC.SHIFT_INV
+./docker-build.sh clean                 # any extra args are passed to make
+```
+
+`--variant <suffix>` selects one of the image's kernel base files (`kernel_base<suffix>.dat`); the available suffixes are `NO_UNDOC`, `SHIFT_INV`, `CTRL_INV`, `NO_UNDOC.SHIFT_INV` and `NO_UNDOC.CTRL_INV`. A `*NO_UNDOC*` variant also assembles the driver undoc-free automatically, and the variant suffix is reflected in the output ROM names exactly as with a local build. Run `./docker-build.sh --help` for the full list.
+
+> **Image tag during the 3.0 beta.** The wrapper defaults to the `:latest` image tag, but while Nextor 3.0 is still in pre-release **no `latest` tag exists yet**: pass the explicit tag (or set `NEXTOR_IMAGE`) until 3.0 is released:
+>
+> ```sh
+> ./docker-build.sh --image ghcr.io/konamiman/nextor-dev:3.0.0-beta1
+> # or: export NEXTOR_IMAGE=ghcr.io/konamiman/nextor-dev:3.0.0-beta1
+> ```
+
+### Building with a local toolchain
 
 The build needs a Nextor kernel base file, supplied via `NEXTOR_BASE`:
 
