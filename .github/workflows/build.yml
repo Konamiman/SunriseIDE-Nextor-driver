@@ -7,6 +7,21 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# The Nextor dev Docker image supplies the whole toolchain (N80, mknexrom), the
+# Nextor SDK and the kernel base files, so CI just runs the build inside it via
+# docker-build.sh — no .NET, Nestor80 download, Nextor checkout, mknexrom build
+# or kernel-base build needed.
+#
+# Requirements:
+#   * The image must be public (it is pulled without authentication). If it is
+#     private, add a `docker/login-action` step before the build using a PAT
+#     with `read:packages` (the default GITHUB_TOKEN can't read a package in
+#     another repository).
+#   * It pulls the `:latest` tag (the newest published image); override it with
+#     the NEXTOR_IMAGE env var below to pin a specific version.
+env:
+  NEXTOR_IMAGE: ghcr.io/konamiman/nextor-dev:latest
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,61 +29,19 @@ jobs:
       fail-fast: false
       matrix:
         variant:
-          - { name: "default",  base_suffix: "",          env: "" }
-          - { name: "no-undoc", base_suffix: ".NO_UNDOC", env: "NO_UNDOC_CPU_INSTRUCTIONS=1" }
+          - { name: "default",  flag: "",                   base_suffix: "" }
+          - { name: "no-undoc", flag: "--variant NO_UNDOC",  base_suffix: ".NO_UNDOC" }
 
     steps:
-      - name: Checkout this driver (sparse submodule)
+      - name: Checkout this driver
         uses: actions/checkout@v4
         with:
           submodules: false
 
-      # `actions/checkout@v4` doesn't natively support sparse submodules, so
-      # initialise the submodule ourselves and limit it to the SDK directory.
-      - name: Initialise SDK submodule (sparse-checkout sdk/ only)
-        run: |
-          git submodule init external/Nextor
-          git -c protocol.file.allow=always submodule update --no-recommend-shallow external/Nextor
-          ( cd external/Nextor && git sparse-checkout init --cone && git sparse-checkout set sdk )
-
-      - name: Set up .NET 8 (required by Nestor80)
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Install Nestor80
-        run: |
-          NESTOR80_VERSION=1.3.4
-          curl -L -o /tmp/nestor80.zip \
-            "https://github.com/Konamiman/Nestor80/releases/download/v${NESTOR80_VERSION}/Nestor80-linux-x64.zip"
-          mkdir -p "$HOME/.local/bin"
-          unzip -d "$HOME/.local/bin" /tmp/nestor80.zip
-          chmod +x "$HOME/.local/bin/N80" "$HOME/.local/bin/LK80" "$HOME/.local/bin/LB80"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Check out Nextor (for kernel base + mknexrom)
-        uses: actions/checkout@v4
-        with:
-          repository: Konamiman/Nextor
-          ref: master
-          path: nextor
-
-      - name: Build mknexrom
-        run: |
-          gcc -O2 -o "$HOME/.local/bin/mknexrom" nextor/buildtools/sources/mknexrom.c
-
-      - name: Build Nextor kernel base file (${{ matrix.variant.name }})
-        run: |
-          cd nextor/source/kernel
-          ${{ matrix.variant.env }} make base
-          # `make base` copies the .dat to nextor/bin/kernels/. Surface the path
-          # for the next step.
-          BASE_FILE="$(ls $GITHUB_WORKSPACE/nextor/bin/kernels/Nextor-*.base${{ matrix.variant.base_suffix }}.dat)"
-          echo "NEXTOR_BASE=$BASE_FILE" >> "$GITHUB_ENV"
-
+      # The image provides the SDK and kernel base files; docker-build.sh runs
+      # `make` inside it, writing the ROMs to bin/ owned by the runner user.
       - name: Build driver ROMs (${{ matrix.variant.name }})
-        run: |
-          ${{ matrix.variant.env }} make
+        run: ./docker-build.sh --image "$NEXTOR_IMAGE" ${{ matrix.variant.flag }}
 
       - name: Confirm all four ROMs were produced
         run: |
