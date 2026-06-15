@@ -92,10 +92,11 @@ The [`nextor-dev`](https://github.com/Konamiman/Nextor/pkgs/container/nextor-dev
 ./docker-build.sh --variant NO_UNDOC    # build against the NO_UNDOC kernel base
 ./docker-build.sh --variant CTRL_INV
 ./docker-build.sh --variant NO_UNDOC.SHIFT_INV
+./docker-build.sh --variant all         # build against every base variant
 ./docker-build.sh clean                 # any extra args are passed to make
 ```
 
-`--variant <suffix>` selects one of the image's kernel base files (`kernel_base<suffix>.dat`); the available suffixes are `NO_UNDOC`, `SHIFT_INV`, `CTRL_INV`, `NO_UNDOC.SHIFT_INV` and `NO_UNDOC.CTRL_INV`. A `*NO_UNDOC*` variant also assembles the driver undoc-free automatically, and the variant suffix is reflected in the output ROM names exactly as with a local build. Run `./docker-build.sh --help` for the full list.
+`--variant <suffix>` selects one of the image's kernel base files (`kernel_base<suffix>.dat`); the available suffixes are `NO_UNDOC`, `SHIFT_INV`, `CTRL_INV`, `NO_UNDOC.SHIFT_INV` and `NO_UNDOC.CTRL_INV`. A `*NO_UNDOC*` variant also assembles the driver undoc-free automatically, and the variant suffix is reflected in the output ROM names exactly as with a local build. `--variant all` builds against every one of the six base variants in a single container (24 ROMs in all). Run `./docker-build.sh --help` for the full list.
 
 > **Image tag during the 3.0 beta.** The wrapper defaults to the `:latest` image tag, but while Nextor 3.0 is still in pre-release **no `latest` tag exists yet**: pass the explicit tag (or set `NEXTOR_IMAGE`) until 3.0 is released:
 >
