@@ -98,13 +98,6 @@ The [`nextor-dev`](https://github.com/Konamiman/Nextor/pkgs/container/nextor-dev
 
 `--variant <suffix>` selects one of the image's kernel base files (`kernel_base<suffix>.dat`); the available suffixes are `NO_UNDOC`, `SHIFT_INV`, `CTRL_INV`, `NO_UNDOC.SHIFT_INV` and `NO_UNDOC.CTRL_INV`. A `*NO_UNDOC*` variant also assembles the driver undoc-free automatically, and the variant suffix is reflected in the output ROM names exactly as with a local build. `--variant all` builds against every one of the six base variants in a single container (24 ROMs in all). Run `./docker-build.sh --help` for the full list.
 
-> **Image tag during the 3.0 beta.** The wrapper defaults to the `:latest` image tag, but while Nextor 3.0 is still in pre-release **no `latest` tag exists yet**: pass the explicit tag (or set `NEXTOR_IMAGE`) until 3.0 is released:
->
-> ```sh
-> ./docker-build.sh --image ghcr.io/konamiman/nextor-dev:3.0.0-beta1
-> # or: export NEXTOR_IMAGE=ghcr.io/konamiman/nextor-dev:3.0.0-beta1
-> ```
-
 ### Building with a local toolchain
 
 The build needs a Nextor kernel base file, supplied via `NEXTOR_BASE`:
