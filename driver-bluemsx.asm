@@ -325,7 +325,7 @@ INVALID_DEVICE:
 DO_DEVQ_GET_STRING:
 	ld a,b
 	or a
-	jr z,RETURN_NOT_IMP
+	jp z,RETURN_NOT_IMP
 
 	cp 4
 	jr z,DO_DEVQ_GET_DEV_NAME
@@ -344,7 +344,7 @@ DO_DEVQ_GET_STRING_2:
 	call NEXTOR2_DEV_INFO
 	pop de
 	or a
-	jr nz,RETURN_NOT_IMP	;Assume no "invalid device" error (we checked device id first)
+	jp nz,RETURN_NOT_IMP	;Assume no "invalid device" error (we checked device id first)
 
 	;IDE strings are 20 char long, so if buffer was at least 21 bytes long
 	;assume success, otherwise assume string was truncated
@@ -423,9 +423,27 @@ CUSTOM_DEVICE_QUERY:
 	ret
 
 READ_WRITE:
-	ld c,1
-	call NEXTOR2_DEV_RW
-	ld b,c
+	push	af		;Save Cy (0 = read, 1 = write) and device number
+	or	a		;Device number 0 never exists
+	jr	z,RW_BADDEV
+	ifdef MASTER_ONLY
+	cp	2		;Only device 1 exists
+	else
+	cp	3		;Only devices 1 and 2 exist
+	endif
+	jr	nc,RW_BADDEV
+	pop	af
+	ld	c,1
+	call	NEXTOR2_DEV_RW
+	ld	b,c
+	cp	.IDEVN		;The device number is valid, so an "invalid device"
+	ret	nz		;error from the old driver code actually means
+	ld	a,.NRDY		;"device currently absent": return "not ready",
+	ret			;as the Nextor 3 driver interface requires
+RW_BADDEV:
+	pop	af
+	ld	a,.IDEVN
+	ld	b,0
 	ret
 
 RETURN_NOT_IMP:

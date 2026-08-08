@@ -636,8 +636,27 @@ CUSTOM_DEVICE_QUERY:
 	ret
 
 READ_WRITE:
-	ld c,1
-	jp NEXTOR2_DEV_RW
+	push	af		;Save Cy (0 = read, 1 = write) and device number
+	or	a		;Device number 0 never exists
+	jr	z,RW_BADDEV
+	ifdef MASTER_ONLY
+	cp	2		;Only device 1 exists
+	else
+	cp	3		;Only devices 1 and 2 exist
+	endif
+	jr	nc,RW_BADDEV
+	pop	af
+	ld	c,1
+	call	NEXTOR2_DEV_RW
+	cp	_IDEVL		;The device number is valid, so an "invalid device"
+	ret	nz		;error from the old driver code actually means
+	ld	a,_NRDY		;"device currently absent": return "not ready",
+	ret			;as the Nextor 3 driver interface requires
+RW_BADDEV:
+	pop	af
+	ld	a,_IDEVL
+	ld	b,0
+	ret
 
 RETURN_NOT_IMP:
 	ld a,RESULT_NOT_IMPLEMENTED

@@ -15,6 +15,9 @@ Four variants are built by default:
 
 The regular (not blueMSX specific) variant can be used in blueMSX too, but then only the slave device will be recognized.
 
+NOTE: To burn the ROM in a Sunrise IDE cartridge or in a Sunrise CF reader cartridge, you can't use the original `IDEFLOAD.COM` program, because it assumes that the file to be burned has a size of 64K but the Nextor kernel is bigger (128K including the driver in current version). Instead, you should use IDEFL128.COM, a modified version of the program that burns 128K files. This program is available at [Konamiman's web site](https://www.konamiman.com/msx/msx-e.html#ide).
+
+
 ## Repository contents
 
 | File                | Purpose                                                                                  |
