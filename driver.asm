@@ -485,13 +485,7 @@ DO_DEVQ_GET_STRING:
 	cp 4
 	jp z,DO_DEVQ_GET_DEV_NAME
 
-	ld a,d
-	or a
-	ret z	   ;Buffer size=0: do nothing, no error
-	dec a
-	jr nz,DO_DEVQ_GET_STRING_2
-	ld (hl),0  ;Buffer size=1: just output terminating 0, no error
-	ret
+	;Note: Buffer sizes 0 and 1 are handled by OUTPUT_STRING.
 
 DO_DEVQ_GET_STRING_2:
 	;HL=user buf, D=user size, B=substring code, C=device number
