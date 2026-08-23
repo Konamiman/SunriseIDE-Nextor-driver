@@ -25,7 +25,9 @@
 # To build inside the Nextor dev Docker image instead of with a local
 # toolchain, use the docker-build.sh wrapper (see README): the image provides
 # N80, mknexrom, the SDK and the kernel base files, presetting NEXTOR_BASE and
-# NEXTOR_SDK so this Makefile needs no extra configuration.
+# NEXTOR_SDK so this Makefile needs no extra configuration. To build against
+# every kernel base variant in a directory (one `make` per base file), use
+# build-all.sh, locally or via `docker-build.sh --variant all`.
 
 
 ### Configurable variables ###################################################
@@ -50,13 +52,14 @@ NEXTOR_SDK ?= external/Nextor/sdk
 N80      ?= N80
 MKNEXROM ?= mknexrom
 
-# NO_UNDOC_CPU_INSTRUCTIONS: when set (e.g. =1) the driver is assembled
-# with undocumented Z80 opcodes (those operating on ixh/ixl/iyh/iyl)
-# replaced with documented equivalents, for compatibility with
-# Z180-based MSX machines. Set this whenever NEXTOR_BASE points at a
-# .NO_UNDOC. variant; the driver developer is responsible for keeping
-# the two consistent.
-NO_UNDOC_CPU_INSTRUCTIONS ?=
+# NO_UNDOC_CPU_INSTRUCTIONS: when non-empty (e.g. =1) the driver is assembled
+# with undocumented Z80 opcodes (those operating on ixh/ixl/iyh/iyl) replaced
+# with documented equivalents, for compatibility with Z180-based MSX machines.
+# It is inferred from the NEXTOR_BASE filename (see "Build flag inference"
+# below): set when the base file's variant suffix contains NO_UNDOC, unset
+# otherwise, so the driver always matches the kernel it is combined with. An
+# explicit value (environment or command line, even an empty one) overrides
+# the inference.
 
 
 ### Output directories #######################################################
@@ -93,6 +96,20 @@ _VARIANT := .$(lastword $(subst base., ,$(_BASE_STEM)))
 else
 _VARIANT :=
 endif
+
+### Build flag inference #####################################################
+
+# The undoc-free kernel bases carry NO_UNDOC in their variant suffix, so unless
+# the flag was given explicitly (`origin` is 'undefined' only when it was not
+# set anywhere, and a deliberate empty value counts as set), derive it from
+# the suffix. A base file with a non-standard name yields no suffix, hence no
+# inference: set the flag by hand in that case.
+ifeq ($(origin NO_UNDOC_CPU_INSTRUCTIONS),undefined)
+NO_UNDOC_CPU_INSTRUCTIONS := $(if $(findstring NO_UNDOC,$(_VARIANT)),1,)
+endif
+
+
+### ROM names ################################################################
 
 _DRIVER_PREFIX := Nextor-$(NEXTOR_KERNEL_VERSION).SunriseIDE
 

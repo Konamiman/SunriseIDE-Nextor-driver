@@ -17,20 +17,16 @@ on:
 #     private, add a `docker/login-action` step before the build using a PAT
 #     with `read:packages` (the default GITHUB_TOKEN can't read a package in
 #     another repository).
-#   * It pulls the `:latest` tag (the newest published image); override it with
-#     the NEXTOR_IMAGE env var below to pin a specific version.
+#   * The image tag is the kernel version this driver targets (the image's
+#     `latest` tag only tracks stable kernel releases, so it can't be used
+#     while targeting a prerelease). Bump NEXTOR_IMAGE below when moving to a
+#     new kernel version, together with the external/Nextor submodule pin.
 env:
-  NEXTOR_IMAGE: ghcr.io/konamiman/nextor-dev:latest
+  NEXTOR_IMAGE: ghcr.io/konamiman/nextor-dev:3.0.0-beta1
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        variant:
-          - { name: "default",  flag: "",                   base_suffix: "" }
-          - { name: "no-undoc", flag: "--variant NO_UNDOC",  base_suffix: ".NO_UNDOC" }
 
     steps:
       - name: Checkout this driver
@@ -39,20 +35,32 @@ jobs:
           submodules: false
 
       # The image provides the SDK and kernel base files; docker-build.sh runs
-      # `make` inside it, writing the ROMs to bin/ owned by the runner user.
-      - name: Build driver ROMs (${{ matrix.variant.name }})
-        run: ./docker-build.sh --image "$NEXTOR_IMAGE" ${{ matrix.variant.flag }}
+      # build-all.sh inside it, which builds against every base-file variant
+      # the image ships, writing the ROMs to bin/ owned by the runner user.
+      - name: Build driver ROMs against every kernel base variant
+        run: ./docker-build.sh --image "$NEXTOR_IMAGE" --variant all
 
-      - name: Confirm all four ROMs were produced
+      # Four ROMs (regular, MasterOnly, blueMSX, MasterOnly.blueMSX) for each
+      # of the twelve kernel base variants: 48 in all.
+      - name: Confirm all 48 ROMs were produced
         run: |
-          for variant in "" ".MasterOnly" ".blueMSX" ".MasterOnly.blueMSX"; do
-            f="$(ls bin/Nextor-*.SunriseIDE${variant}${{ matrix.variant.base_suffix }}.ROM)"
-            [ -s "$f" ] || { echo "Missing or empty: $f"; exit 1; }
-            echo "OK: $f"
+          set -e
+          n=0
+          for base in "" .NO_UNDOC .SHIFT_INV .CTRL_INV .NO_UNDOC.SHIFT_INV .NO_UNDOC.CTRL_INV \
+                      .KANJI_INV .NO_UNDOC.KANJI_INV .SHIFT_INV.KANJI_INV .CTRL_INV.KANJI_INV \
+                      .NO_UNDOC.SHIFT_INV.KANJI_INV .NO_UNDOC.CTRL_INV.KANJI_INV; do
+            for rom in "" .MasterOnly .blueMSX .MasterOnly.blueMSX; do
+              f="$(ls bin/Nextor-*.SunriseIDE${rom}${base}.ROM 2>/dev/null || true)"
+              [ -n "$f" ] && [ -s "$f" ] || { echo "Missing or empty: bin/Nextor-*.SunriseIDE${rom}${base}.ROM"; exit 1; }
+              n=$((n + 1))
+            done
           done
+          total=$(ls bin/*.ROM | wc -l)
+          [ "$total" -eq 48 ] || { echo "Expected 48 ROMs in bin/, found $total"; ls bin; exit 1; }
+          echo "OK: $n ROMs present and non-empty"
 
       - name: Upload ROMs
         uses: actions/upload-artifact@v4
         with:
-          name: sunride-roms-${{ matrix.variant.name }}
+          name: sunrise-ide-roms
           path: bin/Nextor-*.SunriseIDE*.ROM
