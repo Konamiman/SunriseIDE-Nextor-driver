@@ -37,9 +37,11 @@
 # variant: run per variant, each later clean-bin would delete the ROMs just
 # built for the previous variants. The NEXTOR_SDK, N80, MKNEXROM and MAKE
 # environment variables are honoured. NEXTOR_BASE and NEXTOR_SDK assignments
-# (with any make assignment operator) are rejected as arguments: the former
-# is chosen per variant by this script, and the latter must come as an
+# (in any make assignment spelling) are rejected as arguments: the former is
+# chosen per variant by this script, and the latter must come as an
 # environment variable so that the variant selection (see below) uses it too.
+# Make options (-n, -f, ...) are rejected as well: only goals and variable
+# overrides pass through.
 set -eu
 
 # Print the leading comment block (everything from line 2 up to, but not
@@ -52,22 +54,27 @@ case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 
 # The pass-through args reach make after this script's own per-variant
 # NEXTOR_BASE assignment, and in make the last command-line assignment wins
-# (in any of its spellings: =, :=, ::=, :::=, +=, ?=): a forwarded
-# NEXTOR_BASE would silently override the base for every variant, and a
-# forwarded NEXTOR_SDK would steer make but not the family selection below.
-# Reject the two variables this script manages; everything else (targets,
-# other variable overrides) passes through untouched. The cleanup goals are
-# pulled out of the list at the same time, to be run once before the loop:
-# forwarded to every variant, each later `make clean-bin ...` would delete
-# the ROMs just built for the previous variants. (The `for` list is expanded
-# once, before the first iteration, so rebuilding the positional parameters
-# with `set --` inside the loop is safe.)
+# (in any of its spellings: =, :=, ::=, :::=, +=, ?=, !=, with or without
+# whitespace around the operator): a forwarded NEXTOR_BASE would silently
+# override the base for every variant, and a forwarded NEXTOR_SDK would
+# steer make but not the family selection below. Reject the two variables
+# this script manages, in every assignment spelling. Make options are
+# rejected too: this wrapper only understands goals and variable overrides,
+# and classifying anything fancier would mean parsing make's option grammar
+# here (e.g. in a dry-run `-n clean`, the clean would be hoisted below away
+# from the -n and actually delete files). The cleanup goals are pulled out
+# of the list at the same time, to be run once before the loop: forwarded
+# to every variant, each later `make clean-bin ...` would delete the ROMs
+# just built for the previous variants. (The `for` list is expanded once,
+# before the first iteration, so rebuilding the positional parameters with
+# `set --` inside the loop is safe.)
 cleanup=
 for arg do
 	shift
 	case $arg in
-		NEXTOR_BASE[=:+?]*) die "NEXTOR_BASE is chosen per variant by this script; point NEXTOR_KERNEL_BASE_DIR at the directory holding the base files instead" ;;
-		NEXTOR_SDK[=:+?]*)  die "pass NEXTOR_SDK as an environment variable (NEXTOR_SDK=<dir> $0 ...), not as a make argument, so that the variant selection uses it too" ;;
+		NEXTOR_BASE[=:+?!]*|NEXTOR_BASE[[:space:]]*) die "NEXTOR_BASE is chosen per variant by this script; point NEXTOR_KERNEL_BASE_DIR at the directory holding the base files instead" ;;
+		NEXTOR_SDK[=:+?!]*|NEXTOR_SDK[[:space:]]*)   die "pass NEXTOR_SDK as an environment variable (NEXTOR_SDK=<dir> $0 ...), not as a make argument, so that the variant selection uses it too" ;;
+		-*) die "make options are not supported: only goals and variable overrides are passed through. Run make directly for anything else" ;;
 		clean|clean-bin|distclean) cleanup="$cleanup $arg" ;;
 		*) set -- "$@" "$arg" ;;
 	esac
