@@ -6,4 +6,4 @@
 	# checked out on a plain `git submodule update`; this `branch`
 	# setting only kicks in when you ask git to bump the pin to the
 	# branch tip via `git submodule update --remote external/Nextor`.
-	branch = v3.0
+	branch = master
