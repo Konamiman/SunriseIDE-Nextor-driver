@@ -7,6 +7,12 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# The workflow only checks out the repository and uploads a build artifact
+# (which doesn't use the token's repo scopes), so read access to the contents
+# is all the GITHUB_TOKEN needs.
+permissions:
+  contents: read
+
 # The Nextor dev Docker image supplies the whole toolchain (N80, mknexrom), the
 # Nextor SDK and the kernel base files, so CI just runs the build inside it via
 # docker-build.sh — no .NET, Nestor80 download, Nextor checkout, mknexrom build

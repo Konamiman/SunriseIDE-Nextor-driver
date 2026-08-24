@@ -87,11 +87,15 @@ for family in $families; do nfamilies=$((nfamilies + 1)); done
 # mixed in the directory: use the family for the version the SDK reports (the
 # Makefile names the ROMs after it), and give up if there is none.
 if [ "$nfamilies" -gt 1 ]; then
-	sdk_version=$(cat "${NEXTOR_SDK:-external/Nextor/sdk}/nextor-kernel-version.txt" 2>/dev/null || true)
-	wanted="Nextor-${sdk_version:-?}.base"
 	listed=$(echo $families | sed 's/ /, /g')
+	# A relative NEXTOR_SDK resolves against the repository root (we cd'd there
+	# above), which is also how make itself resolves it.
+	sdk_version_file="${NEXTOR_SDK:-external/Nextor/sdk}/nextor-kernel-version.txt"
+	sdk_version=$(cat "$sdk_version_file" 2>/dev/null || true)
+	[ -n "$sdk_version" ] || die "$base_dir holds base files for several kernel versions ($listed) and the SDK's version could not be read from $sdk_version_file to pick one. Fix the SDK (see 'make setup'), or point NEXTOR_KERNEL_BASE_DIR at a directory with a single version"
+	wanted="Nextor-$sdk_version.base"
 	case " $families " in
-		*" $wanted "*) echo "Note: $base_dir holds base files for several kernel versions ($listed); using $wanted[.<suffix>].dat, the SDK's version." ;;
+		*" $wanted "*) echo "Note: $base_dir holds base files for several kernel versions ($listed); using ${wanted}[.<suffix>].dat, the SDK's version." ;;
 		*) die "$base_dir holds base files for several kernel versions ($listed) and none is the SDK's ($wanted). Remove the stale ones, or point NEXTOR_KERNEL_BASE_DIR at a directory with a single version" ;;
 	esac
 	family=$wanted
