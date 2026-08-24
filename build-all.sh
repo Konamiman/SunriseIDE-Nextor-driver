@@ -32,11 +32,14 @@
 # it out rather than guessing.
 #
 # Any arguments are passed through to make (targets, variable overrides), on
-# top of the NEXTOR_BASE set for each variant. The NEXTOR_SDK, N80, MKNEXROM
-# and MAKE environment variables are honoured. NEXTOR_BASE= and NEXTOR_SDK=
-# assignments are rejected as arguments: the former is chosen per variant by
-# this script, and the latter must come as an environment variable so that
-# the variant selection (see below) uses it too.
+# top of the NEXTOR_BASE set for each variant - except that the cleanup goals
+# (clean, clean-bin, distclean) run once, up front, rather than once per
+# variant: run per variant, each later clean-bin would delete the ROMs just
+# built for the previous variants. The NEXTOR_SDK, N80, MKNEXROM and MAKE
+# environment variables are honoured. NEXTOR_BASE and NEXTOR_SDK assignments
+# (with any make assignment operator) are rejected as arguments: the former
+# is chosen per variant by this script, and the latter must come as an
+# environment variable so that the variant selection (see below) uses it too.
 set -eu
 
 # Print the leading comment block (everything from line 2 up to, but not
@@ -48,15 +51,25 @@ die() { echo "build-all.sh: $*" >&2; exit 1; }
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
 
 # The pass-through args reach make after this script's own per-variant
-# NEXTOR_BASE assignment, and in make the last command-line assignment wins:
-# a forwarded NEXTOR_BASE would silently override the base for every variant,
-# and a forwarded NEXTOR_SDK would steer make but not the family selection
-# below. Reject the two variables this script manages; everything else
-# (targets, other variable overrides) passes through untouched.
+# NEXTOR_BASE assignment, and in make the last command-line assignment wins
+# (in any of its spellings: =, :=, ::=, :::=, +=, ?=): a forwarded
+# NEXTOR_BASE would silently override the base for every variant, and a
+# forwarded NEXTOR_SDK would steer make but not the family selection below.
+# Reject the two variables this script manages; everything else (targets,
+# other variable overrides) passes through untouched. The cleanup goals are
+# pulled out of the list at the same time, to be run once before the loop:
+# forwarded to every variant, each later `make clean-bin ...` would delete
+# the ROMs just built for the previous variants. (The `for` list is expanded
+# once, before the first iteration, so rebuilding the positional parameters
+# with `set --` inside the loop is safe.)
+cleanup=
 for arg do
+	shift
 	case $arg in
-		NEXTOR_BASE=*) die "NEXTOR_BASE is chosen per variant by this script; point NEXTOR_KERNEL_BASE_DIR at the directory holding the base files instead" ;;
-		NEXTOR_SDK=*)  die "pass NEXTOR_SDK as an environment variable (NEXTOR_SDK=<dir> $0 ...), not as a make argument, so that the variant selection uses it too" ;;
+		NEXTOR_BASE[=:+?]*) die "NEXTOR_BASE is chosen per variant by this script; point NEXTOR_KERNEL_BASE_DIR at the directory holding the base files instead" ;;
+		NEXTOR_SDK[=:+?]*)  die "pass NEXTOR_SDK as an environment variable (NEXTOR_SDK=<dir> $0 ...), not as a make argument, so that the variant selection uses it too" ;;
+		clean|clean-bin|distclean) cleanup="$cleanup $arg" ;;
+		*) set -- "$@" "$arg" ;;
 	esac
 done
 
@@ -70,6 +83,14 @@ base_dir=$(CDPATH= cd -- "$NEXTOR_KERNEL_BASE_DIR" && pwd)
 cd -- "$(dirname -- "$0")"
 
 MAKE="${MAKE:-make}"
+
+# Cleanup goals given on the command line run once, up front (see above);
+# when they were the only arguments there is nothing else to do.
+if [ -n "$cleanup" ]; then
+	# shellcheck disable=SC2086
+	"$MAKE" $cleanup
+	[ $# -gt 0 ] || exit 0
+fi
 
 
 ### Scan the directory ########################################################
