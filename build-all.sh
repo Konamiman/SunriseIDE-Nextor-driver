@@ -33,7 +33,10 @@
 #
 # Any arguments are passed through to make (targets, variable overrides), on
 # top of the NEXTOR_BASE set for each variant. The NEXTOR_SDK, N80, MKNEXROM
-# and MAKE environment variables are honoured.
+# and MAKE environment variables are honoured. NEXTOR_BASE= and NEXTOR_SDK=
+# assignments are rejected as arguments: the former is chosen per variant by
+# this script, and the latter must come as an environment variable so that
+# the variant selection (see below) uses it too.
 set -eu
 
 # Print the leading comment block (everything from line 2 up to, but not
@@ -43,6 +46,19 @@ usage() { sed -n '2,/^[^#]/p' "$0" | sed '/^[^#]/d; s/^#\{1,\} \{0,1\}//; s/^#$/
 die() { echo "build-all.sh: $*" >&2; exit 1; }
 
 case "${1:-}" in -h|--help) usage; exit 0 ;; esac
+
+# The pass-through args reach make after this script's own per-variant
+# NEXTOR_BASE assignment, and in make the last command-line assignment wins:
+# a forwarded NEXTOR_BASE would silently override the base for every variant,
+# and a forwarded NEXTOR_SDK would steer make but not the family selection
+# below. Reject the two variables this script manages; everything else
+# (targets, other variable overrides) passes through untouched.
+for arg do
+	case $arg in
+		NEXTOR_BASE=*) die "NEXTOR_BASE is chosen per variant by this script; point NEXTOR_KERNEL_BASE_DIR at the directory holding the base files instead" ;;
+		NEXTOR_SDK=*)  die "pass NEXTOR_SDK as an environment variable (NEXTOR_SDK=<dir> $0 ...), not as a make argument, so that the variant selection uses it too" ;;
+	esac
+done
 
 [ -n "${NEXTOR_KERNEL_BASE_DIR:-}" ] || die "NEXTOR_KERNEL_BASE_DIR is not set. Point it at the directory holding the kernel base files (run with --help for details)"
 [ -d "$NEXTOR_KERNEL_BASE_DIR" ] || die "NEXTOR_KERNEL_BASE_DIR points at '$NEXTOR_KERNEL_BASE_DIR' which is not a directory"
