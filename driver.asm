@@ -1,6 +1,6 @@
 	; Driver for the sunrise IDE interface for Nextor
 	;
-    ; Version 0.1.7
+    ; Version 0.1.8
     ; By Konamiman
 	; By Piter Punk
 	; By FRS
@@ -40,7 +40,7 @@ TEMP_WORK equ 0C400h
 
 VER_MAIN	equ	0
 VER_SEC		equ	1
-VER_REV		equ	7
+VER_REV		equ	8
 
 
 ;Miscellaneous configuration
