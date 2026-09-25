@@ -100,7 +100,7 @@ The [`nextor-dev`](https://github.com/Konamiman/Nextor/pkgs/container/nextor-dev
 
 `--variant <suffix>` selects one of the image's kernel base files (`kernel_base<suffix>.dat`). There is a single suffix, `NO_UNDOC` (no undocumented Z80 opcodes, for Z180-based machines); the other variant is the default, suffix-less base, selected by omitting `--variant`. For the `NO_UNDOC` variant the Makefile assembles the driver undoc-free to match, and the variant suffix is reflected in the output ROM names, exactly as with a local build. `--variant all` builds against every base file the image ships in a single container (eight ROMs in all; this runs `build-all.sh`, described below, inside the image). Run `./docker-build.sh --help` for the full list.
 
-The image tag used by default is the kernel version this driver is built for (`3.0.0-beta1`); override it with `--image <ref>` or the `NEXTOR_IMAGE` environment variable. Note that the image's `latest` tag tracks stable kernel releases only, so it is not what you want while the driver targets a prerelease.
+The image tag used by default is the kernel version this driver is built for (`3.0.0-beta2`); override it with `--image <ref>` or the `NEXTOR_IMAGE` environment variable. Note that the image's `latest` tag tracks stable kernel releases only, so it is not what you want while the driver targets a prerelease.
 
 ### Building with a local toolchain
 

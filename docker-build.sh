@@ -33,7 +33,7 @@ set -eu
 # including, the first non-comment line) as help text.
 usage() { sed -n '2,/^[^#]/p' "$0" | sed '/^[^#]/d; s/^#\{1,\} \{0,1\}//; s/^#$//'; }
 
-IMAGE="${NEXTOR_IMAGE:-ghcr.io/konamiman/nextor-dev:3.0.0-beta1}"
+IMAGE="${NEXTOR_IMAGE:-ghcr.io/konamiman/nextor-dev:3.0.0-beta2}"
 KERNEL_BASE_DIR=/opt/nextor/kernel_base
 variant=
 makeargs=
