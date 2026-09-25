@@ -1,7 +1,7 @@
 #!/bin/sh
 # docker-build.sh - build the Sunrise IDE driver ROMs using the Nextor dev
 # Docker image, with no local toolchain, SDK submodule or kernel base file
-# needed: the image supplies N80, mknexrom, the Nextor SDK and all twelve
+# needed: the image supplies N80, mknexrom, the Nextor SDK and both
 # kernel base-file variants, and presets NEXTOR_BASE / NEXTOR_SDK so plain
 # `make` inside it just works.
 #
@@ -10,10 +10,6 @@
 #
 #   ./docker-build.sh                           # all ROMs, default kernel base
 #   ./docker-build.sh --variant NO_UNDOC        # build against the NO_UNDOC base
-#   ./docker-build.sh --variant CTRL_INV
-#   ./docker-build.sh --variant NO_UNDOC.SHIFT_INV
-#   ./docker-build.sh --variant KANJI_INV
-#   ./docker-build.sh --variant NO_UNDOC.CTRL_INV.KANJI_INV
 #   ./docker-build.sh --variant all             # build against every base variant
 #   ./docker-build.sh clean                     # pass-through make targets
 #   ./docker-build.sh --variant NO_UNDOC distclean
@@ -22,19 +18,9 @@
 # image's /opt/nextor/kernel_base/kernel_base<suffix>.dat files):
 #   (omit --variant)    default base
 #   NO_UNDOC            no undocumented Z80 opcodes (Z180-safe)
-#   SHIFT_INV           inverted SHIFT-at-boot behaviour
-#   CTRL_INV            inverted CTRL-at-boot behaviour
-#   NO_UNDOC.SHIFT_INV  combinations of the above
-#   NO_UNDOC.CTRL_INV
-#   KANJI_INV           inverted "6"-at-boot behaviour (Kanji driver installed
-#                       at boot unless "6" is pressed); combines with each of
-#                       the above, always as the last component:
-#                       NO_UNDOC.KANJI_INV, SHIFT_INV.KANJI_INV,
-#                       CTRL_INV.KANJI_INV, NO_UNDOC.SHIFT_INV.KANJI_INV,
-#                       NO_UNDOC.CTRL_INV.KANJI_INV
 #   all                 build against every base file the image ships, in
 #                       one container (runs build-all.sh inside it)
-# For the *NO_UNDOC* variants the Makefile assembles the driver undoc-free to
+# For the NO_UNDOC variant the Makefile assembles the driver undoc-free to
 # match (it infers NO_UNDOC_CPU_INSTRUCTIONS from the base filename).
 #
 # The image is pulled automatically on first use. Override it with --image or
