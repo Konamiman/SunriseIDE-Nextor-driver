@@ -469,6 +469,8 @@ DEVICE_QUERY:
 	jp z,DO_DEVQ_GET_STATUS
 	dec a
 	jp z,DO_DEVQ_GET_AVAILABILITY
+	cp 8-4
+	jp z,DO_DEVQ_READ_BEFORE_INIT
 	ld a,RESULT_NOT_IMPLEMENTED
 	ret
 
@@ -654,6 +656,87 @@ RW_BADDEV:
 
 RETURN_NOT_IMP:
 	ld a,RESULT_NOT_IMPLEMENTED
+	ret
+
+	;--- Device query 8: read device sectors before initialization.
+	;
+	;    Nextor uses this at boot time to read its persistent storage file
+	;    before the driver has been initialized. Therefore no work area
+	;    exists yet, nothing is known about the devices, and nothing must be
+	;    printed. The device is assumed to be an ATA one: an ATAPI device will
+	;    just reject the read command, and that's reported as "not ready" so
+	;    that Nextor tries the next device.
+	;
+	;    Input:  C  = Device number (already validated)
+	;            B  = Number of sectors to read
+	;            HL = Destination address
+	;            DE = Address of the 4 byte sector number
+	;    Output: A  = Error code, as in READ_WRITE
+
+DO_DEVQ_READ_BEFORE_INIT:
+	ld	a,b
+	or	a
+	ret	z			;Nothing to read
+
+	push	de
+	pop	iy
+	ld	a,(iy+3)
+	and	11110000b
+	ld	a,_RNF
+	ret	nz			;Only 28 bit sector numbers supported
+
+	call	IDE_ON
+
+	ld	a,c
+	dec	a
+	jr	z,.devok
+	ld	a,M_DEV
+.devok:
+	or	M_LBA
+	or	(iy+3)
+	call	SELDEV			;This waits for BSY to clear first
+	jr	c,.notready
+
+	ld	a,(iy)
+	ld	(IDE_LBALOW),a
+	ld	e,(iy+1)
+	ld	d,(iy+2)
+	ld	(IDE_LBAMID),de
+	ld	a,b
+	ld	(IDE_SECCNT),a
+
+	ex	de,hl			;DE = Destination address
+	ld	a,ATACMD.PRDSECTRT
+	call	PIO_CMD			;This waits for DRQ too
+	jr	c,.notready
+
+.loop:
+	ld	hl,IDE_DATA
+	push	bc			;LDI changes BC
+	call	LDI512.direct		;No RAM helper here: there's no work area
+	pop	bc
+	dec	b
+	jr	z,.done
+	call	WAIT_DRQ
+	jr	nc,.loop
+
+	call	IDE_OFF
+	ld	a,_DISK
+	ret
+
+.done:
+	call	CHK_RW_FAULT
+	push	af
+	call	IDE_OFF
+	pop	af
+	ld	a,_DISK
+	ret	c
+	xor	a
+	ret
+
+.notready:
+	call	IDE_OFF
+	ld	a,_NRDY
 	ret
 
 MASTER_DEV_S:
@@ -2612,6 +2695,7 @@ WRITE_DATA:
 
 LDI512:	; Z80 optimized 512 byte transfer
 	exx
+.direct:	; Entry for callers that have HL and DE already in place
 	rept 512
 	ldi
 	endm
