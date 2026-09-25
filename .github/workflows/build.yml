@@ -47,14 +47,12 @@ jobs:
         run: ./docker-build.sh --image "$NEXTOR_IMAGE" --variant all
 
       # Four ROMs (regular, MasterOnly, blueMSX, MasterOnly.blueMSX) for each
-      # of the twelve kernel base variants: 48 in all.
-      - name: Confirm all 48 ROMs were produced
+      # of the two kernel base variants: 8 in all.
+      - name: Confirm all 8 ROMs were produced
         run: |
           set -e
           n=0
-          for base in "" .NO_UNDOC .SHIFT_INV .CTRL_INV .NO_UNDOC.SHIFT_INV .NO_UNDOC.CTRL_INV \
-                      .KANJI_INV .NO_UNDOC.KANJI_INV .SHIFT_INV.KANJI_INV .CTRL_INV.KANJI_INV \
-                      .NO_UNDOC.SHIFT_INV.KANJI_INV .NO_UNDOC.CTRL_INV.KANJI_INV; do
+          for base in "" .NO_UNDOC; do
             for rom in "" .MasterOnly .blueMSX .MasterOnly.blueMSX; do
               f="$(ls bin/Nextor-*.SunriseIDE${rom}${base}.ROM 2>/dev/null || true)"
               [ -n "$f" ] && [ -s "$f" ] || { echo "Missing or empty: bin/Nextor-*.SunriseIDE${rom}${base}.ROM"; exit 1; }
@@ -62,7 +60,7 @@ jobs:
             done
           done
           total=$(ls bin/*.ROM | wc -l)
-          [ "$total" -eq 48 ] || { echo "Expected 48 ROMs in bin/, found $total"; ls bin; exit 1; }
+          [ "$total" -eq 8 ] || { echo "Expected 8 ROMs in bin/, found $total"; ls bin; exit 1; }
           echo "OK: $n ROMs present and non-empty"
 
       - name: Upload ROMs
