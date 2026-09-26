@@ -20,10 +20,9 @@
 #   Nextor-<ver>.base[<suffix>].dat    as built by the Nextor repository
 #   kernel_base[<suffix>].dat          as shipped in the Nextor dev image
 #
-# <suffix> is empty for the default base and e.g. .NO_UNDOC, .SHIFT_INV,
-# .NO_UNDOC.CTRL_INV.KANJI_INV otherwise; it ends up in the ROM names, and for
-# the *NO_UNDOC* bases makes the Makefile assemble the driver undoc-free to
-# match, exactly as with a plain `make`.
+# <suffix> is empty for the default base and .NO_UNDOC for the undoc-free one;
+# it ends up in the ROM names, and for the NO_UNDOC base makes the Makefile
+# assemble the driver undoc-free to match, exactly as with a plain `make`.
 #
 # If the directory holds base files for more than one kernel version (e.g.
 # leftovers from an earlier build), the ones for the version the SDK reports
