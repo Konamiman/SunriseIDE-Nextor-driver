@@ -1,27 +1,23 @@
 #!/bin/sh
 # docker-build.sh - build the Sunrise IDE driver ROMs using the Nextor dev
 # Docker image, with no local toolchain, SDK submodule or kernel base file
-# needed: the image supplies N80, mknexrom, the Nextor SDK and both
-# kernel base-file variants, and presets NEXTOR_BASE / NEXTOR_SDK so plain
-# `make` inside it just works.
+# needed: the image supplies N80, mknexrom, the Nextor SDK and the kernel base
+# file, and presets NEXTOR_BASE / NEXTOR_SDK so plain `make` inside it just
+# works.
 #
 # Usage:
-#   ./docker-build.sh [--variant <suffix>] [--image <ref>] [make args...]
+#   ./docker-build.sh [--image <ref>] [make args...]
 #
-#   ./docker-build.sh                           # all ROMs, default kernel base
-#   ./docker-build.sh --variant NO_UNDOC        # build against the NO_UNDOC base
-#   ./docker-build.sh --variant all             # build against every base variant
+#   ./docker-build.sh                           # all four ROMs
 #   ./docker-build.sh clean                     # pass-through make targets
-#   ./docker-build.sh --variant NO_UNDOC distclean
+#   ./docker-build.sh --image <ref> distclean all
 #
-# Kernel base variants (the <suffix> is the part after 'kernel_base' in the
-# image's /opt/nextor/kernel_base/kernel_base<suffix>.dat files):
-#   (omit --variant)    default base
-#   NO_UNDOC            no undocumented Z80 opcodes (Z180-safe)
-#   all                 build against every base file the image ships, in
-#                       one container (runs build-all.sh inside it)
-# For the NO_UNDOC variant the Makefile assembles the driver undoc-free to
-# match (it infers NO_UNDOC_CPU_INSTRUCTIONS from the base filename).
+# The driver doesn't use undocumented Z80 instructions, and it's combined with
+# a kernel base that doesn't use them either. Images built after Nextor PR
+# #286 ship that as their only base file, kernel_base.dat; older images (up to
+# and including 3.0.0-r2) ship it as kernel_base.NO_UNDOC.dat next to a default
+# kernel_base.dat that does use them, so when the image has a .NO_UNDOC base
+# file, that's the one used.
 #
 # The image is pulled automatically on first use. Override it with --image or
 # the NEXTOR_IMAGE environment variable. The default is pinned to the kernel
@@ -34,15 +30,11 @@ set -eu
 usage() { sed -n '2,/^[^#]/p' "$0" | sed '/^[^#]/d; s/^#\{1,\} \{0,1\}//; s/^#$//'; }
 
 IMAGE="${NEXTOR_IMAGE:-ghcr.io/konamiman/nextor-dev:3.0.0}"
-KERNEL_BASE_DIR=/opt/nextor/kernel_base
-variant=
 makeargs=
 
 while [ $# -gt 0 ]; do
 	case "$1" in
 		-h|--help)    usage; exit 0 ;;
-		--variant)    shift; variant="${1:-}" ;;
-		--variant=*)  variant="${1#--variant=}" ;;
 		--image)      shift; IMAGE="${1:-}" ;;
 		--image=*)    IMAGE="${1#--image=}" ;;
 		*)            makeargs="$makeargs $1" ;;
@@ -56,32 +48,20 @@ done
 # a writable home directory.
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
-run_in_image() { # run_in_image <docker-run-args...>
-	# shellcheck disable=SC2086
-	exec docker run --rm \
-		-v "$repo_root":/work \
-		-w /work \
-		--user "$(id -u):$(id -g)" \
-		-e HOME=/tmp \
-		"$@"
-}
-
-if [ "$variant" = all ]; then
-	# Build against every base file the image ships, in a single container:
-	# build-all.sh scans the image's kernel base directory and runs make once
-	# per variant (see that script for the details). Any extra make args are
-	# passed through to it.
-	# shellcheck disable=SC2086
-	run_in_image -e NEXTOR_KERNEL_BASE_DIR="$KERNEL_BASE_DIR" "$IMAGE" ./build-all.sh $makeargs
-fi
-
-# Single variant (or none). Without --variant the image's preset NEXTOR_BASE
-# (the default kernel base) is used; with one, point NEXTOR_BASE at the matching
-# base file.
-envargs=
-if [ -n "$variant" ]; then
-	envargs="-e NEXTOR_BASE=$KERNEL_BASE_DIR/kernel_base.$variant.dat"
-fi
-
-# shellcheck disable=SC2086
-run_in_image $envargs "$IMAGE" make $makeargs
+# Inside the container: use the .NO_UNDOC base file if the image has one (see
+# above), otherwise the image's preset NEXTOR_BASE; then run make with the
+# remaining arguments.
+# shellcheck disable=SC2016,SC2086
+exec docker run --rm \
+	-v "$repo_root":/work \
+	-w /work \
+	--user "$(id -u):$(id -g)" \
+	-e HOME=/tmp \
+	"$IMAGE" \
+	sh -c '
+		no_undoc_base="${NEXTOR_KERNEL_BASE_DIR:-/opt/nextor/kernel_base}/kernel_base.NO_UNDOC.dat"
+		if [ -e "$no_undoc_base" ]; then
+			export NEXTOR_BASE="$no_undoc_base"
+		fi
+		exec make "$@"
+	' sh $makeargs

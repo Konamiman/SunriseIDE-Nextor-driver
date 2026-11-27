@@ -11,7 +11,9 @@ Four variants are built by default:
 | `Nextor-<ver>.SunriseIDE.blueMSX.ROM`            | Master + slave, blueMSX emulator.  |
 | `Nextor-<ver>.SunriseIDE.MasterOnly.blueMSX.ROM` | Master only, blueMSX emulator.                              |
 
-`<ver>` is the kernel version reported by the Nextor SDK (`nextor-kernel-version.txt`), and any kernel-base variant suffix (e.g. `.NO_UNDOC`) is picked up automatically from the `NEXTOR_BASE` filename, see [Building](#building) below.
+`<ver>` is the kernel version reported by the Nextor SDK (`nextor-kernel-version.txt`), see [Building](#building) below.
+
+The driver doesn't use undocumented Z80 instructions, so the ROMs work on Z180-based MSX machines too (e.g. the Victor HC-95), as long as they are built with a kernel base that doesn't use them either (see [Building](#building)).
 
 The regular (not blueMSX specific) variant can be used in blueMSX too, but then only the slave device will be recognized.
 
@@ -27,7 +29,6 @@ NOTE: To burn the ROM in a Sunrise IDE cartridge or in a Sunrise CF reader cartr
 | `chgbnk.asm`        | Bank switching routine specific to the Sunrise IDE cartridge mapper.                     |
 | `Makefile`          | Build rules; see below.                                                                  |
 | `docker-build.sh`   | Wrapper that builds the ROMs in the Nextor dev Docker image (no local toolchain needed). |
-| `build-all.sh`      | Builds the ROMs against every kernel base-file variant found in a directory, with the local toolchain. |
 | `external/Nextor`   | Git submodule pointing at the Nextor repo, sparse-checkout to the `sdk/` directory only. |
 
 ## Development environment
@@ -89,16 +90,14 @@ There are two ways to build: with the **Nextor dev Docker image** (no local tool
 
 ### Building with the Nextor dev Docker image
 
-The [`nextor-dev`](https://github.com/Konamiman/Nextor/pkgs/container/nextor-dev) image bundles `N80`, `mknexrom`, the Nextor SDK and both kernel base-file variants, and presets `NEXTOR_BASE` / `NEXTOR_SDK`, so a build needs nothing else on your machine - not even the `external/Nextor` submodule. The `docker-build.sh` wrapper runs the build in a container, mounting this repository and writing the ROMs into `bin/` owned by you (not root):
+The [`nextor-dev`](https://github.com/Konamiman/Nextor/pkgs/container/nextor-dev) image bundles `N80`, `mknexrom`, the Nextor SDK and the kernel base file, and presets `NEXTOR_BASE` / `NEXTOR_SDK`, so a build needs nothing else on your machine - not even the `external/Nextor` submodule. The `docker-build.sh` wrapper runs the build in a container, mounting this repository and writing the ROMs into `bin/` owned by you (not root):
 
 ```sh
-./docker-build.sh                       # all four ROMs, default kernel base
-./docker-build.sh --variant NO_UNDOC    # build against the NO_UNDOC kernel base
-./docker-build.sh --variant all         # build against every base variant
+./docker-build.sh                       # all four ROMs
 ./docker-build.sh clean                 # any extra args are passed to make
 ```
 
-`--variant <suffix>` selects one of the image's kernel base files (`kernel_base<suffix>.dat`). There is a single suffix, `NO_UNDOC` (no undocumented Z80 opcodes, for Z180-based machines); the other variant is the default, suffix-less base, selected by omitting `--variant`. For the `NO_UNDOC` variant the Makefile assembles the driver undoc-free to match, and the variant suffix is reflected in the output ROM names, exactly as with a local build. `--variant all` builds against every base file the image ships in a single container (eight ROMs in all; this runs `build-all.sh`, described below, inside the image). Run `./docker-build.sh --help` for the full list.
+Images built after [Nextor PR #286](https://github.com/Konamiman/Nextor/pull/286) ship a single kernel base file, which doesn't use undocumented Z80 instructions. Older images (up to and including `3.0.0-r2`) ship two: a default one that does use them, and a `kernel_base.NO_UNDOC.dat` one that doesn't. `docker-build.sh` uses the `.NO_UNDOC` base file whenever the image has one, so the ROMs are free of undocumented instructions with either kind of image. Run `./docker-build.sh --help` for the details.
 
 The image tag used by default is the kernel version this driver is built for (`3.0.0`); override it with `--image <ref>` or the `NEXTOR_IMAGE` environment variable. Note that the image's `latest` tag tracks stable kernel releases only, so it is not what you want while the driver targets a prerelease.
 
@@ -110,26 +109,13 @@ The build needs a Nextor kernel base file, supplied via `NEXTOR_BASE`:
 NEXTOR_BASE=/path/to/Nextor-3.0.0.base.dat make
 ```
 
-That produces all four ROM variants in `bin/`.
+That produces all four ROM variants in `bin/` (the version in their names comes from the SDK, not from the base filename).
 
-For an undoc-instruction-free build (compatible with Z180-based MSX machines), just point `NEXTOR_BASE` at an undoc-free kernel base:
+The kernel base must not use undocumented Z80 instructions either, or the ROMs won't work on Z180-based machines. Nextor builds that include [Nextor PR #286](https://github.com/Konamiman/Nextor/pull/286) produce a single kernel base file, which is fine. Older ones produce two, and the one to use is the `.NO_UNDOC` one:
 
 ```sh
 NEXTOR_BASE=/path/to/Nextor-3.0.0.base.NO_UNDOC.dat make
 ```
-
-The Nextor base filename's variant suffix (e.g. `.NO_UNDOC`) is mirrored in the output ROM filenames (the version in them comes from the SDK, not from the base filename), and a `NO_UNDOC` in it makes the Makefile assemble the driver without undocumented opcodes (`NO_UNDOC_CPU_INSTRUCTIONS=1`) so that it matches the kernel. The inference only works when the base file follows one of the two naming conventions (`Nextor-<ver>.base[<suffix>].dat` or `kernel_base[<suffix>].dat`); with a base file named otherwise, set `NO_UNDOC_CPU_INSTRUCTIONS` by hand. An explicit value on the command line or in the environment always wins over the inference.
-
-#### Building against every kernel base variant
-
-To build the ROMs for all the kernel base-file variants at once (the local counterpart of `docker-build.sh --variant all`), point `NEXTOR_KERNEL_BASE_DIR` at the directory holding the base files and run `build-all.sh`:
-
-```sh
-NEXTOR_KERNEL_BASE_DIR=/path/to/Nextor/bin/kernel-base ./build-all.sh
-NEXTOR_KERNEL_BASE_DIR=/path/to/Nextor/bin/kernel-base ./build-all.sh clean-bin all   # extra args go to make
-```
-
-There is no list of variants to maintain: the script scans the directory and builds against every `.dat` file there named by either convention the Makefile understands (`Nextor-<ver>.base[<suffix>].dat`, as built by the Nextor repository, or `kernel_base[<suffix>].dat`, as shipped in the Docker image), ordering the builds so the driver is reassembled only once when crossing into the undoc-free (`*NO_UNDOC*`) group. With the two variants of Nextor 3.0 that is eight ROMs. If the directory mixes base files from several kernel versions, the ones matching the SDK's version are used (and the script stops if none do). Run `./build-all.sh --help` for the details.
 
 ### Building without `make`
 
@@ -164,7 +150,6 @@ The other three variants are slight modifications of the same recipe:
       /d:tmp/padded.bin /m:tmp/chgbnk.bin
   ```
   Combine with `MASTER_ONLY` if you want the MasterOnly blueMSX variant.
-- **NO_UNDOC**: add `--define-symbols NO_UNDOC_CPU_INSTRUCTIONS` to *every* `N80` call (regardless of which variant you're building), and use a `Nextor-<ver>.base.NO_UNDOC.dat` kernel base. The driver-side and base-side undoc settings must match.
 
 ## Make variables
 
@@ -174,7 +159,6 @@ The other three variants are slight modifications of the same recipe:
 | `NEXTOR_SDK`                | Path to the Nextor SDK directory (the one containing `asm/`).        | `external/Nextor/sdk`  |
 | `N80`                       | Path to the Nestor80 assembler.                                      | `N80` (from `PATH`)    |
 | `MKNEXROM`                  | Path to the `mknexrom` tool.                                         | `mknexrom` (from `PATH`) |
-| `NO_UNDOC_CPU_INSTRUCTIONS` | If non-empty (e.g. `=1`), assemble the driver without undocumented opcodes. | _inferred: `1` if the `NEXTOR_BASE` filename's variant suffix contains `NO_UNDOC`, unset otherwise_ |
 
 Cleanup targets:
 

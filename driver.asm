@@ -13,8 +13,6 @@ DRV_START:
 
 	.RELAB
 
-	INCLUDE asm/macros/undoc.inc
-
 	INCLUDE asm/constants/driver_result_codes.inc
 
 	module DRIVER_QUERY
@@ -1340,7 +1338,8 @@ DEV_RW2:
 	ld	b,0
 	ret	
 DEV_RW_NO0SEC:
- 	ld_ iy,de
+	push	de
+	pop	iy
 	ld	a,(iy+3)
 	and	11110000b
 	jp	nz,DEV_RW_NOSEC	;Only 28 bit sector numbers supported
@@ -1378,7 +1377,10 @@ DEV_ATA_RD:
 
 	call	CHK_RW_FAULT
 	ret	c
-	ld_	iyl,b		; iyl=number of blocks
+	ld	a,b
+	exx
+	ld	b,a		; b'=number of blocks
+	exx
 	ex	de,hl		; de=destination address
 
 	ld	bc,512		; block size  ***Hardcoded. Ignores (BLKLEN)
@@ -1395,7 +1397,10 @@ DEV_ATA_WR:
 	ld	a,ATACMD.PWRSECTRT	; PIO write sector with retry
 	call	PIO_CMD
 	jp	c,DEV_RW_ERR
-	ld_	iyl,b		; iyl=number of blocks
+	ld	a,b
+	exx
+	ld	b,a		; b'=number of blocks
+	exx
 
 	ld	bc,512		; block size  ***Hardcoded. Ignores (BLKLEN)
 	call	WRITE_DATA
@@ -1413,7 +1418,8 @@ DEV_ATAPI_RW:
 	push	de
 	ld	e,(ix+DEVINFO.pBASEWRK)		; hl=pointer to WorkArea
 	ld	d,(ix+DEVINFO.pBASEWRK+1)
-	ld_ iy,de				; iy=WRKAREA pointer
+	push	de
+	pop	iy				; iy=WRKAREA pointer
 	pop	de
 
 	; Set the block size
@@ -1460,7 +1466,9 @@ DEV_ATAPI_RD:
 	push	bc
 	push 	hl
 	push	iy
-	ld_	iyl,1			; 1 block
+	exx
+	ld	b,1			; b'=1 block
+	exx
 	ld	hl,WRKAREA.PCTBUFF
 	ld	bc,PCTRW10._SIZE		; block size=10 bytes
 	call	WRITE_DATA		; Send the packet to the device
@@ -1503,13 +1511,18 @@ DEV_ATAPI_RD:
 	ex	de,hl		; de=destination address
 .loopsector:
 	push	bc
-	ld_	iyl,c		; get the number of blocks per sector
+	ld	a,c
+	exx
+	ld	b,a		; b'=number of blocks per sector
+	exx
 .loopblock:
 	call	WAIT_DRQ
 	jr	c,.rderr
 	ld	hl,IDE_DATA
 	call	RUN_HLPR
-	dec_	iyl
+	exx			; (exx doesn't modify the flags)
+	dec	b		; b'=remaining blocks
+	exx
 	jr	nz,.loopblock
 	pop	bc
 	djnz	.loopsector
@@ -1531,7 +1544,9 @@ DEV_ATAPI_WR:
 	push	bc
 	push	hl
 	push	iy
-	ld_	iyl,1			; 1 block
+	exx
+	ld	b,1			; b'=1 block
+	exx
 	ld	hl,WRKAREA.PCTBUFF
 	ld	bc,PCTRW10._SIZE		; block size=10 bytes
 	call	WRITE_DATA		; Send the packet to the device
@@ -1573,7 +1588,10 @@ DEV_ATAPI_WR:
 	pop	bc
 .loopsector:
 	push	bc
-	ld_	iyl,c		; get the number of blocks per sector
+	ld	a,c
+	exx
+	ld	b,a		; b'=number of blocks per sector
+	exx
 .loopblock:
 	call	WAIT_DRQ
 	jr	c,.rderr
@@ -1581,7 +1599,9 @@ DEV_ATAPI_WR:
 	call	RUN_HLPR
 	call	CHK_RW_FAULT
 	jr	c,.rderr
-	dec_	iyl
+	exx			; (exx doesn't modify the flags)
+	dec	b		; b'=remaining blocks
+	exx
 	jp	nz,.loopblock
 	pop	bc
 	djnz	.loopsector
@@ -2123,7 +2143,9 @@ LUN_NFO_ATAPI:
 	push	hl		; Source=PCTBUF
 	ld	bc,12		; 12 byte packet
 	push	iy
-	ld_	iyl,1
+	exx
+	ld	b,1		; b'=1 block
+	exx
 	call	WRITE_DATA	; Send the packet to the device
 	pop	iy
 	jr	nc,.rdmediapropr	; No error? Then read media proprieties
@@ -2141,7 +2163,9 @@ LUN_NFO_ATAPI:
 	pop	de		; Destination=PCTBUFF
 	ld	bc,8		; 8 byte response
 	push	iy
-	ld_	iyl,1
+	exx
+	ld	b,1		; b'=1 block
+	exx
 	call	READ_DATA
 	pop	iy
 	jr	c,LUN_INFO_ERROR
@@ -2662,7 +2686,8 @@ DIAGERRPRT:
 ; Subroutine to read blocks of arbitrary size on the IDE 
 ; Input: DE =Data destination
 ;	 BC =block size
-;        IYL=Number of blocks
+;        B' =Number of blocks
+; Modifies: AF, BC, DE, HL, BC', DE', HL'
 READ_DATA:
 	call	SETLDIRHLPR	; hl'=Pointer to data transfer helper
 .loop:
@@ -2670,7 +2695,9 @@ READ_DATA:
 	ret	c
 	ld	hl,IDE_DATA
 	call	RUN_HLPR
-	dec_	iyl
+	exx			; (exx doesn't modify the flags)
+	dec	b		; b'=remaining blocks
+	exx
 	jp	nz,.loop
 	ret
 
@@ -2679,7 +2706,8 @@ READ_DATA:
 ; Subroutine to write blocks of arbitrary size on the IDE
 ; Input: HL =Data source
 ;        BC =block size
-;        IYL=Number of blocks
+;        B' =Number of blocks
+; Modifies: AF, BC, DE, HL, BC', DE', HL'
 WRITE_DATA:
 	call	SETLDIRHLPR	; hl'=Pointer to LDIR helper in RAM
 .loop:
@@ -2689,7 +2717,9 @@ WRITE_DATA:
 	call	RUN_HLPR
 	call	CHK_RW_FAULT
 	ret	c
-	dec_	iyl
+	exx			; (exx doesn't modify the flags)
+	dec	b		; b'=remaining blocks
+	exx
 	jp	nz,.loop
 	ret
 

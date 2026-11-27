@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 # The Nextor dev Docker image supplies the whole toolchain (N80, mknexrom), the
-# Nextor SDK and the kernel base files, so CI just runs the build inside it via
+# Nextor SDK and the kernel base file, so CI just runs the build inside it via
 # docker-build.sh — no .NET, Nestor80 download, Nextor checkout, mknexrom build
 # or kernel-base build needed.
 #
@@ -40,27 +40,23 @@ jobs:
         with:
           submodules: false
 
-      # The image provides the SDK and kernel base files; docker-build.sh runs
-      # build-all.sh inside it, which builds against every base-file variant
-      # the image ships, writing the ROMs to bin/ owned by the runner user.
-      - name: Build driver ROMs against every kernel base variant
-        run: ./docker-build.sh --image "$NEXTOR_IMAGE" --variant all
+      # The image provides the SDK and the kernel base file; docker-build.sh
+      # runs make inside it, writing the ROMs to bin/ owned by the runner user.
+      - name: Build driver ROMs
+        run: ./docker-build.sh --image "$NEXTOR_IMAGE"
 
-      # Four ROMs (regular, MasterOnly, blueMSX, MasterOnly.blueMSX) for each
-      # of the two kernel base variants: 8 in all.
-      - name: Confirm all 8 ROMs were produced
+      # Four ROMs: regular, MasterOnly, blueMSX and MasterOnly.blueMSX.
+      - name: Confirm all 4 ROMs were produced
         run: |
           set -e
           n=0
-          for base in "" .NO_UNDOC; do
-            for rom in "" .MasterOnly .blueMSX .MasterOnly.blueMSX; do
-              f="$(ls bin/Nextor-*.SunriseIDE${rom}${base}.ROM 2>/dev/null || true)"
-              [ -n "$f" ] && [ -s "$f" ] || { echo "Missing or empty: bin/Nextor-*.SunriseIDE${rom}${base}.ROM"; exit 1; }
-              n=$((n + 1))
-            done
+          for rom in "" .MasterOnly .blueMSX .MasterOnly.blueMSX; do
+            f="$(ls bin/Nextor-*.SunriseIDE${rom}.ROM 2>/dev/null || true)"
+            [ -n "$f" ] && [ -s "$f" ] || { echo "Missing or empty: bin/Nextor-*.SunriseIDE${rom}.ROM"; exit 1; }
+            n=$((n + 1))
           done
           total=$(ls bin/*.ROM | wc -l)
-          [ "$total" -eq 8 ] || { echo "Expected 8 ROMs in bin/, found $total"; ls bin; exit 1; }
+          [ "$total" -eq 4 ] || { echo "Expected 4 ROMs in bin/, found $total"; ls bin; exit 1; }
           echo "OK: $n ROMs present and non-empty"
 
       - name: Upload ROMs
